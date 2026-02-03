@@ -1,0 +1,75 @@
+# blockymodel-web
+
+> Web-based 3D editor for BlockyModel format (.blockymodel) built with Three.js. Provides selection, transform gizmos, property editing, hierarchy management, UV editing, and undo/redo support.
+
+## Overview
+
+BlockyModel is a JSON-based 3D model format used for voxel-style game assets. This library provides both a viewer and full editor for creating and modifying .blockymodel files in the browser.
+
+## Installation
+
+```bash
+npm install blockymodel-web three
+```
+
+## Quick Start
+
+```typescript
+import { Editor, ViewerController, BlockyModelLoader } from 'blockymodel-web';
+
+// Create viewer
+const viewer = new ViewerController(container);
+
+// Load model
+const loader = new BlockyModelLoader();
+const model = await loader.loadAsync('model.blockymodel');
+viewer.scene.add(model);
+
+// Enable editing
+const editor = new Editor(viewer.scene, viewer.camera, viewer.renderer, viewer.controls);
+```
+
+## Core Components
+
+- **Editor**: Central state manager coordinating selection, transforms, and history
+- **SelectionManager**: Raycasting-based 3D object selection with visual highlighting
+- **TransformManager**: Three.js TransformControls wrapper (G=translate, R=rotate, S=scale)
+- **History**: Undo/redo stack using command pattern with automatic merging
+- **Serializer**: Exports Three.js scene graph back to BlockyModel JSON format
+
+## UI Components
+
+- **PropertyPanel**: Edit position, rotation, scale, and shape properties
+- **HierarchyPanel**: Tree view with context menu for add/delete/duplicate nodes
+- **UVEditor**: Per-face texture UV offset, mirror, and rotation controls
+
+## Commands (for undo/redo)
+
+- SetPositionCommand, SetRotationCommand, SetScaleCommand
+- SetPropertyCommand (supports nested property paths)
+- AddNodeCommand, RemoveNodeCommand
+
+## BlockyModel Format
+
+```typescript
+interface BlockyModel {
+  format?: "character" | "prop";
+  lod?: "auto" | string;
+  nodes: BlockyNode[];
+}
+
+interface BlockyNode {
+  id: string;
+  name: string;
+  position?: { x: number; y: number; z: number };
+  orientation?: { w: number; x: number; y: number; z: number };
+  shape: BlockyShape;
+  children: BlockyNode[];
+}
+```
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/blockymodel-web)
+- [GitHub repository](https://github.com/ZacxDev/blockymodel-web)
+- [Three.js documentation](https://threejs.org/docs/)
