@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BlockyModel Editor</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Toolbar -->
+      <header class="toolbar">
+        <h1>BlockyModel Editor</h1>
+
+        <div class="toolbar-group">
+          <label class="file-btn">
+            📁 Load Model
+            <input type="file" id="model-input" accept=".blockymodel,.json" />
+          </label>
+
+          <label class="file-btn">
+            🖼️ Load Texture
+            <input type="file" id="texture-input" accept="image/*" />
+          </label>
+
+          <button id="save-model" class="toolbar-btn">💾 Save</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <div class="toolbar-group">
+          <button id="undo-btn" class="toolbar-btn" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
+          <button id="redo-btn" class="toolbar-btn" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <div class="toolbar-group mode-group">
+          <button id="mode-translate" class="mode-btn active" title="Translate (G)">↔ Move</button>
+          <button id="mode-rotate" class="mode-btn" title="Rotate (R)">⟳ Rotate</button>
+          <button id="mode-scale" class="mode-btn" title="Scale (S)">⤢ Scale</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <div class="toolbar-group toggle-group">
+          <input type="checkbox" id="wireframe-toggle" />
+          <label for="wireframe-toggle">Wireframe</label>
+        </div>
+
+        <button id="reset-camera" class="toolbar-btn">↺ Reset View</button>
+      </header>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- 3D Viewport -->
+        <div id="viewport"></div>
+
+        <!-- Side Panel -->
+        <aside class="side-panel">
+          <!-- Hierarchy Panel -->
+          <div class="panel-section">
+            <div class="panel-header collapsible" data-target="hierarchy-content">
+              <span class="collapse-icon">▼</span>
+              Hierarchy
+            </div>
+            <div class="panel-content" id="hierarchy-content">
+              <div id="hierarchy-panel"></div>
+            </div>
+          </div>
+
+          <!-- Properties Panel -->
+          <div class="panel-section">
+            <div class="panel-header collapsible" data-target="properties-content">
+              <span class="collapse-icon">▼</span>
+              Properties
+            </div>
+            <div class="panel-content" id="properties-content">
+              <div id="property-panel"></div>
+            </div>
+          </div>
+
+          <!-- UV Editor Panel -->
+          <div class="panel-section">
+            <div class="panel-header collapsible" data-target="uv-content">
+              <span class="collapse-icon">▼</span>
+              UV Layout
+            </div>
+            <div class="panel-content" id="uv-content">
+              <div id="uv-panel"></div>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <!-- Status Bar -->
+      <footer class="status-bar">
+        <span id="status">Ready - Drag & drop files or use the toolbar</span>
+        <span id="selection-info"></span>
+        <span id="mode-info">Mode: Translate</span>
+        <div class="shortcuts">
+          <span><kbd>G</kbd> Move</span>
+          <span><kbd>R</kbd> Rotate</span>
+          <span><kbd>S</kbd> Scale</span>
+          <span><kbd>Ctrl+Z</kbd> Undo</span>
+          <span><kbd>Del</kbd> Delete</span>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
