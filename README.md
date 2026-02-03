@@ -5,6 +5,8 @@ Web-based 3D editor for BlockyModel format (.blockymodel) built with [Three.js](
 ![License](https://img.shields.io/npm/l/blockymodel-web)
 ![npm](https://img.shields.io/npm/v/blockymodel-web)
 
+**[Live Demo](https://editor.hytalegarage.com)** - Try the editor in your browser
+
 ## Features
 
 - **3D Viewport** - Interactive scene with orbit controls
