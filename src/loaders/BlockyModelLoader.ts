@@ -4,12 +4,12 @@ import type {
   BlockyNode,
   BlockyShape,
   Vec3,
-} from "../types/blockymodel.ts";
+} from "../types/blockymodel";
 import {
   DEFAULT_POSITION,
   DEFAULT_ORIENTATION,
   DEFAULT_STRETCH,
-} from "../types/blockymodel.ts";
+} from "../types/blockymodel";
 
 /**
  * Loader for .blockymodel files

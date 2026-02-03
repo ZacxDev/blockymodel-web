@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { BlockyModelLoader, applyTextureToModel } from "../loaders/BlockyModelLoader.ts";
+import { BlockyModelLoader, applyTextureToModel } from "../loaders/BlockyModelLoader";
 
 export interface ViewerOptions {
   container: HTMLElement;
