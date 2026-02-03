@@ -1,6 +1,6 @@
 {
   "name": "blockymodel-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web-based 3D editor for BlockyModel format with transform gizmos, hierarchy panel, property editing, and undo/redo",
   "type": "module",
   "main": "./dist/blockymodel-web.umd.cjs",
