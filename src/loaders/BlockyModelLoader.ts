@@ -139,6 +139,7 @@ export class BlockyModelLoader extends THREE.Loader {
     mesh.userData.shapeType = "box";
     mesh.userData.originalSize = size;
     mesh.userData.shadingMode = shape.shadingMode;
+    mesh.userData.textureLayout = shape.textureLayout;
 
     // Handle double-sided
     if (shape.doubleSided) {
@@ -267,6 +268,11 @@ export function applyTextureToModel(
   texture.magFilter = THREE.NearestFilter;
   texture.minFilter = THREE.NearestFilter;
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+
+  // Get texture dimensions (from image if available)
+  const textureWidth = texture.image?.width || 64;
+  const textureHeight = texture.image?.height || 64;
 
   model.traverse((object) => {
     if (object instanceof THREE.Mesh) {
@@ -276,6 +282,112 @@ export function applyTextureToModel(
         material.color.setHex(0xffffff); // Reset color to white when texture applied
         material.needsUpdate = true;
       }
+
+      // Apply texture layout if available for box shapes
+      if (object.userData.shapeType === "box" && object.userData.textureLayout) {
+        applyTextureLayoutToGeometry(
+          object.geometry as THREE.BufferGeometry,
+          object.userData.textureLayout,
+          textureWidth,
+          textureHeight
+        );
+      }
     }
   });
+}
+
+
+// Face names for BoxGeometry in Three.js order
+type FaceName = "front" | "back" | "left" | "right" | "top" | "bottom";
+const FACE_NAMES: FaceName[] = ["right", "left", "top", "bottom", "front", "back"];
+
+interface FaceUV {
+  offset?: { x: number; y: number };
+  mirror?: { x: boolean; y: boolean };
+  angle?: 0 | 90 | 180 | 270;
+}
+
+interface TextureLayout {
+  front?: FaceUV;
+  back?: FaceUV;
+  left?: FaceUV;
+  right?: FaceUV;
+  top?: FaceUV;
+  bottom?: FaceUV;
+}
+
+/**
+ * Apply texture layout to a BoxGeometry's UV coordinates
+ * @param geometry The box geometry to modify
+ * @param layout The texture layout with per-face UV settings
+ * @param textureWidth Texture width in pixels
+ * @param textureHeight Texture height in pixels
+ */
+export function applyTextureLayoutToGeometry(
+  geometry: THREE.BufferGeometry,
+  layout: TextureLayout,
+  textureWidth: number,
+  textureHeight: number
+): void {
+  const uvAttribute = geometry.getAttribute("uv");
+  if (!uvAttribute) return;
+
+  // BoxGeometry face order in Three.js: +x, -x, +y, -y, +z, -z
+  // Which maps to: right, left, top, bottom, front, back
+  const faceIndexMap: Record<FaceName, number> = {
+    right: 0,
+    left: 1,
+    top: 2,
+    bottom: 3,
+    front: 4,
+    back: 5,
+  };
+
+  // Store original UVs to reset before applying transforms
+  const originalUVs = new Float32Array(uvAttribute.array.length);
+  for (let i = 0; i < uvAttribute.array.length; i++) {
+    originalUVs[i] = uvAttribute.array[i];
+  }
+
+  const uvs = uvAttribute.array as Float32Array;
+
+  for (const face of FACE_NAMES) {
+    const faceUV = layout[face];
+    if (!faceUV) continue;
+
+    const faceIndex = faceIndexMap[face];
+    const startVertex = faceIndex * 6; // 6 vertices per face (2 triangles)
+
+    // Calculate normalized offset
+    const offsetX = (faceUV.offset?.x || 0) / textureWidth;
+    const offsetY = (faceUV.offset?.y || 0) / textureHeight;
+
+    // Apply transforms to each vertex's UV
+    for (let i = 0; i < 6; i++) {
+      const idx = (startVertex + i) * 2;
+      
+      // Start with original UVs
+      let u = originalUVs[idx];
+      let v = originalUVs[idx + 1];
+
+      // Mirror
+      if (faceUV.mirror?.x) u = 1 - u;
+      if (faceUV.mirror?.y) v = 1 - v;
+
+      // Rotation around center (0.5, 0.5)
+      if (faceUV.angle) {
+        const rad = (faceUV.angle * Math.PI) / 180;
+        const cu = u - 0.5;
+        const cv = v - 0.5;
+        u = cu * Math.cos(rad) - cv * Math.sin(rad) + 0.5;
+        v = cu * Math.sin(rad) + cv * Math.cos(rad) + 0.5;
+      }
+
+      // Apply offset
+      uvs[idx] = u + offsetX;
+      uvs[idx + 1] = v + offsetY;
+    }
+  }
+
+  uvAttribute.needsUpdate = true;
 }

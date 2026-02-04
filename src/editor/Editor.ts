@@ -10,7 +10,8 @@ export type EditorEvent =
   | "objectChanged"
   | "historyChanged"
   | "modeChanged"
-  | "modelLoaded";
+  | "modelLoaded"
+  | "modelCleared";
 
 export interface EditorOptions {
   scene: THREE.Scene;
@@ -86,6 +87,19 @@ export class Editor {
     this.selection.deselect();
     this.history.clear();
     this.emit("modelLoaded", model);
+  }
+
+
+  /**
+   * Clear the current model and reset editor state
+   * Call this before loading a new model to ensure clean state
+   */
+  clearModel(): void {
+    this.selection.deselect();
+    this.transform.attach(null);
+    this.history.clear();
+    this.currentModel = null;
+    this.emit("modelCleared");
   }
 
   /**

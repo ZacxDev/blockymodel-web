@@ -253,6 +253,12 @@ export class UVEditor {
 
     if (!uvAttribute) return;
 
+    // Get texture dimensions from material
+    const material = mesh.material as THREE.MeshStandardMaterial;
+    const texture = material.map;
+    const textureWidth = texture?.image?.width || 64;
+    const textureHeight = texture?.image?.height || 64;
+
     // BoxGeometry has 6 faces, 2 triangles each, 3 vertices each = 36 vertices
     // Face order: +x, -x, +y, -y, +z, -z
     // For each face: 6 vertices (2 triangles)
@@ -265,28 +271,40 @@ export class UVEditor {
       back: 5,
     };
 
+    // Reset geometry to default UVs first, then apply transforms
+    // Default BoxGeometry UVs are 0-1 for each face
     const uvs = uvAttribute.array as Float32Array;
+
+    // Default BoxGeometry UV pattern for each face (2 triangles = 6 vertices)
+    const defaultFaceUVs = [
+      // Triangle 1: bottom-left, bottom-right, top-left
+      [0, 0], [1, 0], [0, 1],
+      // Triangle 2: bottom-right, top-right, top-left
+      [1, 0], [1, 1], [0, 1]
+    ];
 
     for (const face of FACE_NAMES) {
       const faceUV = layout[face] || DEFAULT_FACE_UV;
       const faceIndex = faceIndexMap[face];
       const startVertex = faceIndex * 6;
 
-      // Offset (in texture units, normalized to 0-1 assuming 64px texture)
-      const offsetX = (faceUV.offset?.x || 0) / 64;
-      const offsetY = (faceUV.offset?.y || 0) / 64;
+      // Calculate normalized offset
+      const offsetX = (faceUV.offset?.x || 0) / textureWidth;
+      const offsetY = (faceUV.offset?.y || 0) / textureHeight;
 
-      // Apply offset to each vertex's UV
+      // Apply transforms to each vertex's UV
       for (let i = 0; i < 6; i++) {
         const idx = (startVertex + i) * 2;
-        let u = uvs[idx];
-        let v = uvs[idx + 1];
+        
+        // Start with default UVs
+        let u = defaultFaceUVs[i][0];
+        let v = defaultFaceUVs[i][1];
 
         // Mirror
         if (faceUV.mirror?.x) u = 1 - u;
         if (faceUV.mirror?.y) v = 1 - v;
 
-        // Rotation around center
+        // Rotation around center (0.5, 0.5)
         if (faceUV.angle) {
           const rad = (faceUV.angle * Math.PI) / 180;
           const cu = u - 0.5;

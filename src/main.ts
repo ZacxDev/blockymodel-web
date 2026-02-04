@@ -4,6 +4,7 @@ import { Editor } from "./editor/Editor";
 import { PropertyPanel } from "./ui/PropertyPanel";
 import { HierarchyPanel } from "./ui/HierarchyPanel";
 import { UVEditor } from "./ui/UVEditor";
+import { confirm } from "./ui/ConfirmDialog";
 import { Serializer } from "./editor/Serializer";
 import "./styles.css";
 
@@ -124,7 +125,33 @@ function setupFileInputs(): void {
   }
 }
 
-async function loadModel(file: File): Promise<void> {
+/**
+ * Load a model file with confirmation if a model is already loaded
+ * @param file The .blockymodel file to load
+ * @param skipConfirm Skip the confirmation dialog (for internal use)
+ */
+async function loadModel(file: File, skipConfirm = false): Promise<void> {
+  // Check if a model is already loaded
+  if (!skipConfirm && editor.getModel()) {
+    const confirmed = await confirm({
+      title: "Load New Model?",
+      message: "Current changes will be lost. Do you want to continue?",
+      confirmText: "Load",
+      cancelText: "Cancel",
+    });
+
+    if (!confirmed) {
+      // Reset the file input so the same file can be selected again
+      const modelInput = document.getElementById("model-input") as HTMLInputElement;
+      if (modelInput) modelInput.value = "";
+      return;
+    }
+
+    // Clear the current state
+    editor.clearModel();
+    hierarchyPanel.refresh();
+  }
+
   try {
     updateStatus("Loading model...");
     const model = await viewer.loadModel(file);
