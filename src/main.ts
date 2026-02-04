@@ -4,6 +4,7 @@ import { Editor } from "./editor/Editor";
 import { PropertyPanel } from "./ui/PropertyPanel";
 import { HierarchyPanel } from "./ui/HierarchyPanel";
 import { UVEditor } from "./ui/UVEditor";
+import { TextureDebugPanel } from "./ui/TextureDebugPanel";
 import { confirm } from "./ui/ConfirmDialog";
 import { Serializer } from "./editor/Serializer";
 import "./styles.css";
@@ -14,6 +15,7 @@ let editor: Editor;
 let _propertyPanel: PropertyPanel;
 let hierarchyPanel: HierarchyPanel;
 let _uvEditor: UVEditor;
+let textureDebugPanel: TextureDebugPanel;
 let serializer: Serializer;
 
 function init(): void {
@@ -42,6 +44,7 @@ function init(): void {
   _propertyPanel = new PropertyPanel(editor, "property-panel");
   hierarchyPanel = new HierarchyPanel(editor, "hierarchy-panel");
   _uvEditor = new UVEditor(editor, "uv-panel");
+  textureDebugPanel = new TextureDebugPanel(editor, "texture-debug-panel");
 
   // Setup file inputs
   setupFileInputs();
@@ -80,7 +83,10 @@ function setupFileInputs(): void {
     if (file) {
       try {
         updateStatus("Applying texture...");
-        await viewer.loadTexture(file);
+        const texture = await viewer.loadTexture(file);
+        if (texture) {
+          textureDebugPanel.setTexture(texture);
+        }
         updateStatus(`Texture applied: ${file.name}`);
       } catch (error) {
         updateStatus(`Error: ${error}`);
@@ -117,7 +123,10 @@ function setupFileInputs(): void {
         if (file.name.endsWith(".blockymodel")) {
           await loadModel(file);
         } else if (file.name.match(/\.(png|jpg|jpeg)$/i)) {
-          await viewer.loadTexture(file);
+          const texture = await viewer.loadTexture(file);
+          if (texture) {
+            textureDebugPanel.setTexture(texture);
+          }
           updateStatus(`Texture applied: ${file.name}`);
         }
       }

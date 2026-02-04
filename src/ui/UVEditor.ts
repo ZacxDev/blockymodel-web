@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Editor } from "../editor/Editor";
 import { SetPropertyCommand } from "../editor/commands/SetPropertyCommand";
 import type { FaceUV, TextureLayout } from "../types/blockymodel";
+import { applyTextureLayoutToGeometry } from "../loaders/BlockyModelLoader";
 
 type FaceName = "front" | "back" | "left" | "right" | "top" | "bottom";
 
@@ -241,17 +242,13 @@ export class UVEditor {
 
   /**
    * Apply texture layout to geometry UVs
-   * Note: This is a simplified implementation - full UV mapping would require
-   * knowing the texture atlas dimensions
+   * Uses the shared applyTextureLayoutToGeometry function from BlockyModelLoader
    */
   private applyTextureLayout(layout: TextureLayout): void {
     if (!this.currentObject || !(this.currentObject instanceof THREE.Mesh)) return;
 
     const mesh = this.currentObject;
     const geometry = mesh.geometry as THREE.BufferGeometry;
-    const uvAttribute = geometry.getAttribute("uv");
-
-    if (!uvAttribute) return;
 
     // Get texture dimensions from material
     const material = mesh.material as THREE.MeshStandardMaterial;
@@ -259,67 +256,16 @@ export class UVEditor {
     const textureWidth = texture?.image?.width || 64;
     const textureHeight = texture?.image?.height || 64;
 
-    // BoxGeometry has 6 faces, 2 triangles each, 3 vertices each = 36 vertices
-    // Face order: +x, -x, +y, -y, +z, -z
-    // For each face: 6 vertices (2 triangles)
-    const faceIndexMap: Record<FaceName, number> = {
-      right: 0,
-      left: 1,
-      top: 2,
-      bottom: 3,
-      front: 4,
-      back: 5,
-    };
+    // Get box size from userData
+    const boxSize = mesh.userData.originalSize || { x: 1, y: 1, z: 1 };
 
-    // Reset geometry to default UVs first, then apply transforms
-    // Default BoxGeometry UVs are 0-1 for each face
-    const uvs = uvAttribute.array as Float32Array;
-
-    // Default BoxGeometry UV pattern for each face (2 triangles = 6 vertices)
-    const defaultFaceUVs = [
-      // Triangle 1: bottom-left, bottom-right, top-left
-      [0, 0], [1, 0], [0, 1],
-      // Triangle 2: bottom-right, top-right, top-left
-      [1, 0], [1, 1], [0, 1]
-    ];
-
-    for (const face of FACE_NAMES) {
-      const faceUV = layout[face] || DEFAULT_FACE_UV;
-      const faceIndex = faceIndexMap[face];
-      const startVertex = faceIndex * 6;
-
-      // Calculate normalized offset
-      const offsetX = (faceUV.offset?.x || 0) / textureWidth;
-      const offsetY = (faceUV.offset?.y || 0) / textureHeight;
-
-      // Apply transforms to each vertex's UV
-      for (let i = 0; i < 6; i++) {
-        const idx = (startVertex + i) * 2;
-        
-        // Start with default UVs
-        let u = defaultFaceUVs[i][0];
-        let v = defaultFaceUVs[i][1];
-
-        // Mirror
-        if (faceUV.mirror?.x) u = 1 - u;
-        if (faceUV.mirror?.y) v = 1 - v;
-
-        // Rotation around center (0.5, 0.5)
-        if (faceUV.angle) {
-          const rad = (faceUV.angle * Math.PI) / 180;
-          const cu = u - 0.5;
-          const cv = v - 0.5;
-          u = cu * Math.cos(rad) - cv * Math.sin(rad) + 0.5;
-          v = cu * Math.sin(rad) + cv * Math.cos(rad) + 0.5;
-        }
-
-        // Apply offset
-        uvs[idx] = u + offsetX;
-        uvs[idx + 1] = v + offsetY;
-      }
-    }
-
-    uvAttribute.needsUpdate = true;
+    applyTextureLayoutToGeometry(
+      geometry,
+      layout,
+      textureWidth,
+      textureHeight,
+      boxSize
+    );
   }
 
   /**

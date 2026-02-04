@@ -285,11 +285,13 @@ export function applyTextureToModel(
 
       // Apply texture layout if available for box shapes
       if (object.userData.shapeType === "box" && object.userData.textureLayout) {
+        const boxSize = object.userData.originalSize || { x: 1, y: 1, z: 1 };
         applyTextureLayoutToGeometry(
           object.geometry as THREE.BufferGeometry,
           object.userData.textureLayout,
           textureWidth,
-          textureHeight
+          textureHeight,
+          boxSize
         );
       }
     }
@@ -317,17 +319,123 @@ interface TextureLayout {
 }
 
 /**
+ * Calculate face dimensions based on box size
+ * Each face's texture region size is determined by the box dimensions
+ */
+function getFaceDimensions(
+  face: FaceName,
+  boxSize: { x: number; y: number; z: number }
+): [number, number] {
+  switch (face) {
+    case "front":
+    case "back":
+      return [boxSize.x, boxSize.y];
+    case "left":
+    case "right":
+      return [boxSize.z, boxSize.y];
+    case "top":
+    case "bottom":
+      return [boxSize.x, boxSize.z];
+  }
+}
+
+/**
+ * Calculate UV rectangle for a face based on Hytale's blockymodel format
+ *
+ * The offset specifies the TOP-LEFT corner of the texture region in PIXEL coordinates.
+ * Mirror flips the sampling direction (swaps start/end).
+ * Angle rotates the UV region, swapping dimensions for 90/270.
+ *
+ * Based on Hytale Blockbench Plugin implementation.
+ */
+function calculateFaceUVs(
+  faceUV: FaceUV,
+  faceWidth: number,
+  faceHeight: number,
+  textureWidth: number,
+  textureHeight: number
+): [number, number, number, number] {
+  const offset = faceUV.offset || { x: 0, y: 0 };
+  const mirror = faceUV.mirror || { x: false, y: false };
+  const angle = faceUV.angle || 0;
+
+  let uvWidth = faceWidth;
+  let uvHeight = faceHeight;
+  let mirrorX = mirror.x ? -1 : 1;
+  let mirrorY = mirror.y ? -1 : 1;
+
+  let u1: number, v1: number, u2: number, v2: number;
+
+  switch (angle) {
+    case 90:
+      // Swap dimensions and mirror axes
+      [uvWidth, uvHeight] = [uvHeight, uvWidth];
+      [mirrorX, mirrorY] = [mirrorY, mirrorX];
+      mirrorX *= -1;
+      u1 = offset.x;
+      v1 = offset.y + uvHeight * mirrorY;
+      u2 = offset.x + uvWidth * mirrorX;
+      v2 = offset.y;
+      break;
+
+    case 180:
+      mirrorX *= -1;
+      mirrorY *= -1;
+      u1 = offset.x + uvWidth * mirrorX;
+      v1 = offset.y + uvHeight * mirrorY;
+      u2 = offset.x;
+      v2 = offset.y;
+      break;
+
+    case 270:
+      [uvWidth, uvHeight] = [uvHeight, uvWidth];
+      [mirrorX, mirrorY] = [mirrorY, mirrorX];
+      mirrorY *= -1;
+      u1 = offset.x + uvWidth * mirrorX;
+      v1 = offset.y;
+      u2 = offset.x;
+      v2 = offset.y + uvHeight * mirrorY;
+      break;
+
+    case 0:
+    default:
+      u1 = offset.x;
+      v1 = offset.y;
+      u2 = offset.x + uvWidth * mirrorX;
+      v2 = offset.y + uvHeight * mirrorY;
+      break;
+  }
+
+  // Normalize to 0-1 range
+  return [
+    u1 / textureWidth,
+    v1 / textureHeight,
+    u2 / textureWidth,
+    v2 / textureHeight,
+  ];
+}
+
+/**
  * Apply texture layout to a BoxGeometry's UV coordinates
+ *
+ * Implements Hytale's blockymodel texture mapping:
+ * - Offset is the top-left pixel coordinate of the face's texture region
+ * - Face dimensions determine the size of the UV region (in pixels)
+ * - Mirror swaps start/end coordinates
+ * - Angle rotates by swapping dimensions and adjusting coordinates
+ *
  * @param geometry The box geometry to modify
  * @param layout The texture layout with per-face UV settings
  * @param textureWidth Texture width in pixels
  * @param textureHeight Texture height in pixels
+ * @param boxSize Optional box dimensions for calculating face sizes (defaults to 1,1,1)
  */
 export function applyTextureLayoutToGeometry(
   geometry: THREE.BufferGeometry,
   layout: TextureLayout,
   textureWidth: number,
-  textureHeight: number
+  textureHeight: number,
+  boxSize: { x: number; y: number; z: number } = { x: 1, y: 1, z: 1 }
 ): void {
   const uvAttribute = geometry.getAttribute("uv");
   if (!uvAttribute) return;
@@ -343,49 +451,45 @@ export function applyTextureLayoutToGeometry(
     back: 5,
   };
 
-  // Store original UVs to reset before applying transforms
-  const originalUVs = new Float32Array(uvAttribute.array.length);
-  for (let i = 0; i < uvAttribute.array.length; i++) {
-    originalUVs[i] = uvAttribute.array[i];
-  }
-
   const uvs = uvAttribute.array as Float32Array;
+  const verticesPerFace = 4;
 
   for (const face of FACE_NAMES) {
     const faceUV = layout[face];
     if (!faceUV) continue;
 
     const faceIndex = faceIndexMap[face];
-    const startVertex = faceIndex * 6; // 6 vertices per face (2 triangles)
+    const startVertex = faceIndex * verticesPerFace;
 
-    // Calculate normalized offset
-    const offsetX = (faceUV.offset?.x || 0) / textureWidth;
-    const offsetY = (faceUV.offset?.y || 0) / textureHeight;
+    // Get face dimensions from box size
+    const [faceWidth, faceHeight] = getFaceDimensions(face, boxSize);
 
-    // Apply transforms to each vertex's UV
-    for (let i = 0; i < 6; i++) {
+    // Calculate UV rectangle
+    const [u1, v1, u2, v2] = calculateFaceUVs(
+      faceUV,
+      faceWidth,
+      faceHeight,
+      textureWidth,
+      textureHeight
+    );
+
+    // BoxGeometry vertex order per face (looking at front face):
+    // [0]: bottom-left, [1]: bottom-right, [2]: top-left, [3]: top-right
+    //
+    // Note: V coordinate is flipped because Hytale uses image coordinates
+    // (top-left origin) while Three.js textures use bottom-left origin.
+    // We flip V by using (1 - v) to convert between coordinate systems.
+    const vertexUVs = [
+      [u1, 1 - v2], // bottom-left  (v2 is bottom in image coords)
+      [u2, 1 - v2], // bottom-right
+      [u1, 1 - v1], // top-left     (v1 is top in image coords)
+      [u2, 1 - v1], // top-right
+    ];
+
+    for (let i = 0; i < 4; i++) {
       const idx = (startVertex + i) * 2;
-      
-      // Start with original UVs
-      let u = originalUVs[idx];
-      let v = originalUVs[idx + 1];
-
-      // Mirror
-      if (faceUV.mirror?.x) u = 1 - u;
-      if (faceUV.mirror?.y) v = 1 - v;
-
-      // Rotation around center (0.5, 0.5)
-      if (faceUV.angle) {
-        const rad = (faceUV.angle * Math.PI) / 180;
-        const cu = u - 0.5;
-        const cv = v - 0.5;
-        u = cu * Math.cos(rad) - cv * Math.sin(rad) + 0.5;
-        v = cu * Math.sin(rad) + cv * Math.cos(rad) + 0.5;
-      }
-
-      // Apply offset
-      uvs[idx] = u + offsetX;
-      uvs[idx + 1] = v + offsetY;
+      uvs[idx] = vertexUVs[i][0];
+      uvs[idx + 1] = vertexUVs[i][1];
     }
   }
 

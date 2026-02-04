@@ -157,11 +157,12 @@ export class ViewerController {
 
   /**
    * Load a texture and apply to current model
+   * @returns The loaded texture, or null if no model is loaded
    */
-  async loadTexture(file: File): Promise<void> {
+  async loadTexture(file: File): Promise<THREE.Texture | null> {
     if (!this.currentModel) {
       console.warn("No model loaded to apply texture to");
-      return;
+      return null;
     }
 
     const url = URL.createObjectURL(file);
@@ -173,6 +174,7 @@ export class ViewerController {
 
       applyTextureToModel(this.currentModel, texture);
       console.log("Texture applied");
+      return texture;
     } finally {
       URL.revokeObjectURL(url);
     }
