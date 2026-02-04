@@ -209,6 +209,9 @@ export class BlockyModelLoader extends THREE.Loader {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.userData.shapeType = "quad";
     mesh.userData.shadingMode = shape.shadingMode;
+    mesh.userData.textureLayout = shape.textureLayout;
+    mesh.userData.originalSize = size;
+    mesh.userData.normal = normal;
 
     return mesh;
   }
@@ -228,6 +231,8 @@ export class BlockyModelLoader extends THREE.Loader {
           emissiveIntensity: 1,
           roughness: 1,
           metalness: 0,
+          transparent: true,
+          alphaTest: 0.1,
         });
 
       case "flat":
@@ -236,6 +241,8 @@ export class BlockyModelLoader extends THREE.Loader {
           flatShading: true,
           roughness: 0.9,
           metalness: 0,
+          transparent: true,
+          alphaTest: 0.1,
         });
 
       case "reflective":
@@ -243,6 +250,8 @@ export class BlockyModelLoader extends THREE.Loader {
           color: baseColor,
           roughness: 0.1,
           metalness: 0.8,
+          transparent: true,
+          alphaTest: 0.1,
         });
 
       case "standard":
@@ -251,6 +260,8 @@ export class BlockyModelLoader extends THREE.Loader {
           color: baseColor,
           roughness: 0.7,
           metalness: 0,
+          transparent: true,
+          alphaTest: 0.1,
         });
     }
   }
@@ -280,6 +291,9 @@ export function applyTextureToModel(
       if (material.isMeshStandardMaterial) {
         material.map = texture;
         material.color.setHex(0xffffff); // Reset color to white when texture applied
+        // Enable transparency for PNG alpha support
+        material.transparent = true;
+        material.alphaTest = 0.1;
         material.needsUpdate = true;
       }
 
@@ -292,6 +306,19 @@ export function applyTextureToModel(
           textureWidth,
           textureHeight,
           boxSize
+        );
+      }
+
+      // Apply texture layout for quad shapes
+      if (object.userData.shapeType === "quad" && object.userData.textureLayout) {
+        const size = object.userData.originalSize || { x: 1, y: 1, z: 1 };
+        applyTextureLayoutToQuad(
+          object.geometry as THREE.BufferGeometry,
+          object.userData.textureLayout,
+          textureWidth,
+          textureHeight,
+          size,
+          object.userData.normal || "+Z"
         );
       }
     }
@@ -316,6 +343,99 @@ interface TextureLayout {
   right?: FaceUV;
   top?: FaceUV;
   bottom?: FaceUV;
+}
+
+type NormalDirection = "+X" | "-X" | "+Y" | "-Y" | "+Z" | "-Z";
+
+/**
+ * Map normal direction to the corresponding face name for texture layout
+ */
+function normalToFaceName(normal: NormalDirection): FaceName {
+  switch (normal) {
+    case "+X": return "right";
+    case "-X": return "left";
+    case "+Y": return "top";
+    case "-Y": return "bottom";
+    case "+Z": return "front";
+    case "-Z": return "back";
+  }
+}
+
+/**
+ * Get quad dimensions based on normal direction
+ */
+function getQuadDimensions(
+  size: { x: number; y: number; z: number },
+  normal: NormalDirection
+): [number, number] {
+  switch (normal) {
+    case "+X":
+    case "-X":
+      return [size.z, size.y];
+    case "+Y":
+    case "-Y":
+      return [size.x, size.z];
+    case "+Z":
+    case "-Z":
+    default:
+      return [size.x, size.y];
+  }
+}
+
+/**
+ * Apply texture layout to a PlaneGeometry's UV coordinates
+ * Quads use the face corresponding to their normal direction
+ */
+function applyTextureLayoutToQuad(
+  geometry: THREE.BufferGeometry,
+  layout: TextureLayout,
+  textureWidth: number,
+  textureHeight: number,
+  size: { x: number; y: number; z: number },
+  normal: string
+): void {
+  const uvAttribute = geometry.getAttribute("uv");
+  if (!uvAttribute) return;
+
+  const normalDir = normal as NormalDirection;
+  const faceName = normalToFaceName(normalDir);
+  const faceUV = layout[faceName];
+
+  const uvs = uvAttribute.array as Float32Array;
+
+  if (!faceUV) {
+    // No texture layout - sample transparent point at origin
+    for (let i = 0; i < uvs.length; i += 2) {
+      uvs[i] = 0;
+      uvs[i + 1] = 1;
+    }
+  } else {
+    const [faceWidth, faceHeight] = getQuadDimensions(size, normalDir);
+    const [u1, v1, u2, v2] = calculateFaceUVs(
+      faceUV,
+      faceWidth,
+      faceHeight,
+      textureWidth,
+      textureHeight
+    );
+
+    // PlaneGeometry has 4 vertices in order:
+    // [0]: top-left, [1]: top-right, [2]: bottom-left, [3]: bottom-right
+    // (Different from BoxGeometry face vertex order!)
+    const vertexUVs = [
+      [u1, 1 - v1], // top-left
+      [u2, 1 - v1], // top-right
+      [u1, 1 - v2], // bottom-left
+      [u2, 1 - v2], // bottom-right
+    ];
+
+    for (let i = 0; i < 4; i++) {
+      uvs[i * 2] = vertexUVs[i][0];
+      uvs[i * 2 + 1] = vertexUVs[i][1];
+    }
+  }
+
+  uvAttribute.needsUpdate = true;
 }
 
 /**
@@ -456,35 +576,46 @@ export function applyTextureLayoutToGeometry(
 
   for (const face of FACE_NAMES) {
     const faceUV = layout[face];
-    if (!faceUV) continue;
-
     const faceIndex = faceIndexMap[face];
     const startVertex = faceIndex * verticesPerFace;
 
-    // Get face dimensions from box size
-    const [faceWidth, faceHeight] = getFaceDimensions(face, boxSize);
+    let vertexUVs: number[][];
 
-    // Calculate UV rectangle
-    const [u1, v1, u2, v2] = calculateFaceUVs(
-      faceUV,
-      faceWidth,
-      faceHeight,
-      textureWidth,
-      textureHeight
-    );
+    if (!faceUV) {
+      // Faces without textureLayout should sample a single point at origin
+      // This typically maps to a transparent pixel, preventing "floating" texture artifacts
+      vertexUVs = [
+        [0, 1], // All vertices at same point (0,0 in image coords = 0,1 in UV)
+        [0, 1],
+        [0, 1],
+        [0, 1],
+      ];
+    } else {
+      // Get face dimensions from box size
+      const [faceWidth, faceHeight] = getFaceDimensions(face, boxSize);
 
-    // BoxGeometry vertex order per face (looking at front face):
-    // [0]: bottom-left, [1]: bottom-right, [2]: top-left, [3]: top-right
-    //
-    // Note: V coordinate is flipped because Hytale uses image coordinates
-    // (top-left origin) while Three.js textures use bottom-left origin.
-    // We flip V by using (1 - v) to convert between coordinate systems.
-    const vertexUVs = [
-      [u1, 1 - v2], // bottom-left  (v2 is bottom in image coords)
-      [u2, 1 - v2], // bottom-right
-      [u1, 1 - v1], // top-left     (v1 is top in image coords)
-      [u2, 1 - v1], // top-right
-    ];
+      // Calculate UV rectangle
+      const [u1, v1, u2, v2] = calculateFaceUVs(
+        faceUV,
+        faceWidth,
+        faceHeight,
+        textureWidth,
+        textureHeight
+      );
+
+      // BoxGeometry vertex order per face (looking at front face):
+      // [0]: bottom-left, [1]: bottom-right, [2]: top-left, [3]: top-right
+      //
+      // Note: V coordinate is flipped because Hytale uses image coordinates
+      // (top-left origin) while Three.js textures use bottom-left origin.
+      // We flip V by using (1 - v) to convert between coordinate systems.
+      vertexUVs = [
+        [u1, 1 - v2], // bottom-left  (v2 is bottom in image coords)
+        [u2, 1 - v2], // bottom-right
+        [u1, 1 - v1], // top-left     (v1 is top in image coords)
+        [u2, 1 - v1], // top-right
+      ];
+    }
 
     for (let i = 0; i < 4; i++) {
       const idx = (startVertex + i) * 2;

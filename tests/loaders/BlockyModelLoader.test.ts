@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import * as THREE from "three";
-import { applyTextureLayoutToGeometry } from "../../src/loaders/BlockyModelLoader";
+import {
+  applyTextureLayoutToGeometry,
+  applyTextureToModel,
+  BlockyModelLoader,
+} from "../../src/loaders/BlockyModelLoader";
 
 describe("applyTextureLayoutToGeometry", () => {
   let geometry: THREE.BoxGeometry;
@@ -44,14 +48,16 @@ describe("applyTextureLayoutToGeometry", () => {
       expect(newSum).not.toBe(originalSum);
     });
 
-    it("should not modify geometry when layout is empty", () => {
-      const originalUVs = cloneUVs(geometry);
-
+    it("should set safe UVs when layout is empty", () => {
+      // When layout is empty, all faces should be set to safe origin UVs
+      // to sample a transparent pixel instead of random texture areas
       applyTextureLayoutToGeometry(geometry, {}, 64, 64);
 
       const uvAttr = geometry.getAttribute("uv");
-      for (let i = 0; i < uvAttr.count * 2; i++) {
-        expect(uvAttr.array[i]).toBe(originalUVs[i]);
+      // All UVs should be set to (0, 1) - the safe origin point
+      for (let i = 0; i < uvAttr.count; i++) {
+        expect(uvAttr.array[i * 2]).toBe(0);     // U = 0
+        expect(uvAttr.array[i * 2 + 1]).toBe(1); // V = 1 (top of texture in UV space)
       }
     });
 
@@ -289,5 +295,155 @@ describe("applyTextureLayoutToGeometry", () => {
       }
       expect(hasChange).toBe(true);
     });
+  });
+
+  describe("partial face layouts", () => {
+    it("should set undefined faces to safe origin UVs", () => {
+      // Only define front face, others should get safe UVs
+      const layout = {
+        front: { offset: { x: 16, y: 16 }, mirror: { x: false, y: false }, angle: 0 as const },
+      };
+
+      applyTextureLayoutToGeometry(geometry, layout, 64, 64);
+
+      const uvAttr = geometry.getAttribute("uv");
+      const uvs = uvAttr.array as Float32Array;
+
+      // Front face (index 4) should have the defined layout
+      // Other faces should be at safe origin (0, 1)
+
+      // Check back face (index 5) - should be at safe origin
+      const backStartVertex = 5 * 4; // face 5, 4 vertices per face
+      for (let i = 0; i < 4; i++) {
+        const idx = (backStartVertex + i) * 2;
+        expect(uvs[idx]).toBe(0);     // U = 0
+        expect(uvs[idx + 1]).toBe(1); // V = 1 (safe origin)
+      }
+    });
+  });
+});
+
+describe("applyTextureToModel", () => {
+  it("should enable transparency on materials", () => {
+    const model = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.shapeType = "box";
+    model.add(mesh);
+
+    // Create a mock texture
+    const texture = new THREE.Texture();
+    texture.image = { width: 64, height: 64 };
+
+    applyTextureToModel(model, texture);
+
+    // Check that transparency is enabled
+    const appliedMaterial = mesh.material as THREE.MeshStandardMaterial;
+    expect(appliedMaterial.transparent).toBe(true);
+    expect(appliedMaterial.alphaTest).toBe(0.1);
+  });
+
+  it("should apply texture layout to box shapes with textureLayout", () => {
+    const model = new THREE.Group();
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.shapeType = "box";
+    mesh.userData.originalSize = { x: 2, y: 2, z: 2 };
+    mesh.userData.textureLayout = {
+      front: { offset: { x: 0, y: 0 }, mirror: { x: false, y: false }, angle: 0 },
+    };
+    model.add(mesh);
+
+    const originalUVs = new Float32Array(geometry.getAttribute("uv").array);
+
+    const texture = new THREE.Texture();
+    texture.image = { width: 64, height: 64 };
+
+    applyTextureToModel(model, texture);
+
+    // UVs should have changed
+    const newUVs = geometry.getAttribute("uv").array;
+    let hasChange = false;
+    for (let i = 0; i < newUVs.length; i++) {
+      if (Math.abs(newUVs[i] - originalUVs[i]) > 0.001) {
+        hasChange = true;
+        break;
+      }
+    }
+    expect(hasChange).toBe(true);
+  });
+});
+
+describe("BlockyModelLoader material creation", () => {
+  it("should create materials with transparency enabled", () => {
+    const loader = new BlockyModelLoader();
+
+    // Parse a minimal model with a box (using type assertion for partial data)
+    const model = loader.parse({
+      lod: "high",
+      nodes: [{
+        id: "test",
+        name: "TestBox",
+        shape: {
+          type: "box",
+          visible: true,
+          shadingMode: "standard",
+          settings: { size: { x: 1, y: 1, z: 1 } },
+        },
+        children: [],
+      }],
+    } as Parameters<typeof loader.parse>[0]);
+
+    // Find the mesh
+    let foundMesh: THREE.Mesh | null = null;
+    model.traverse((obj: THREE.Object3D) => {
+      if (obj instanceof THREE.Mesh) {
+        foundMesh = obj;
+      }
+    });
+
+    expect(foundMesh).not.toBeNull();
+    const material = foundMesh!.material as THREE.MeshStandardMaterial;
+    expect(material.transparent).toBe(true);
+    expect(material.alphaTest).toBe(0.1);
+  });
+
+  it("should store textureLayout in quad userData", () => {
+    const loader = new BlockyModelLoader();
+
+    const model = loader.parse({
+      lod: "high",
+      nodes: [{
+        id: "test",
+        name: "TestQuad",
+        shape: {
+          type: "quad",
+          visible: true,
+          shadingMode: "standard",
+          settings: {
+            size: { x: 2, y: 2, z: 0 },
+            normal: "+Z",
+          },
+          textureLayout: {
+            front: { offset: { x: 10, y: 10 }, mirror: { x: false, y: false }, angle: 0 },
+          },
+        },
+        children: [],
+      }],
+    } as Parameters<typeof loader.parse>[0]);
+
+    let foundMesh: THREE.Mesh | null = null;
+    model.traverse((obj: THREE.Object3D) => {
+      if (obj instanceof THREE.Mesh) {
+        foundMesh = obj;
+      }
+    });
+
+    expect(foundMesh).not.toBeNull();
+    expect(foundMesh!.userData.shapeType).toBe("quad");
+    expect(foundMesh!.userData.textureLayout).toBeDefined();
+    expect(foundMesh!.userData.normal).toBe("+Z");
   });
 });

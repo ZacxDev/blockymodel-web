@@ -21,7 +21,11 @@ export { HierarchyPanel } from "./ui/HierarchyPanel";
 export { UVEditor } from "./ui/UVEditor";
 
 // Loader
-export { BlockyModelLoader } from "./loaders/BlockyModelLoader";
+export {
+  BlockyModelLoader,
+  applyTextureToModel,
+  applyTextureLayoutToGeometry,
+} from "./loaders/BlockyModelLoader";
 
 // Viewer
 export { ViewerController } from "./viewer/ViewerController";
