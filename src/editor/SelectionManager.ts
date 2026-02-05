@@ -17,24 +17,48 @@ export class SelectionManager {
   private highlightedMaterials: Map<THREE.Mesh, { emissive: THREE.Color; emissiveIntensity: number }> = new Map();
   private eventListeners: Map<string, Set<SelectionCallback>> = new Map();
 
+  // Track mouse down position to distinguish clicks from drags
+  private mouseDownPos: { x: number; y: number } | null = null;
+  private static readonly DRAG_THRESHOLD = 5; // pixels
+
   constructor(editor: Editor) {
     this.editor = editor;
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
 
     // Bind event handlers
+    this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.editor.domElement.addEventListener("pointerdown", this.handlePointerDown);
     this.editor.domElement.addEventListener("click", this.handleClick);
   }
 
   /**
-   * Handle click events for selection
+   * Record pointer down position to detect drags
+   */
+  private handlePointerDown(event: PointerEvent): void {
+    this.mouseDownPos = { x: event.clientX, y: event.clientY };
+  }
+
+  /**
+   * Handle click events for selection — suppressed if mouse was dragged
    */
   private handleClick(event: MouseEvent): void {
     // Ignore if clicking on UI elements or during transform
     if (event.target !== this.editor.renderer.domElement) {
       return;
     }
+
+    // Suppress selection if mouse moved beyond drag threshold (orbit/pan)
+    if (this.mouseDownPos) {
+      const dx = event.clientX - this.mouseDownPos.x;
+      const dy = event.clientY - this.mouseDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > SelectionManager.DRAG_THRESHOLD) {
+        this.mouseDownPos = null;
+        return;
+      }
+    }
+    this.mouseDownPos = null;
 
     const rect = this.editor.domElement.getBoundingClientRect();
     this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -176,6 +200,7 @@ export class SelectionManager {
    * Clean up
    */
   dispose(): void {
+    this.editor.domElement.removeEventListener("pointerdown", this.handlePointerDown);
     this.editor.domElement.removeEventListener("click", this.handleClick);
     this.removeHighlight();
     this.eventListeners.clear();

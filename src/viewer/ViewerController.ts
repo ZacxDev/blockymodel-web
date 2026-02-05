@@ -236,6 +236,15 @@ export class ViewerController {
     });
   }
 
+  toggleDoubleSide(enabled: boolean): void {
+    this.currentModel?.traverse((object) => {
+      if (object instanceof THREE.Mesh) {
+        const material = object.material as THREE.MeshStandardMaterial;
+        material.side = enabled ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    });
+  }
+
   /**
    * Get model hierarchy for debugging
    */

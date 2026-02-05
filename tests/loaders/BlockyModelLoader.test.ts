@@ -447,3 +447,95 @@ describe("BlockyModelLoader material creation", () => {
     expect(foundMesh!.userData.normal).toBe("+Z");
   });
 });
+
+describe("vertex UV order (0.1.5 fix)", () => {
+  it("should assign top-left vertex (index 0) the top-left UV", () => {
+    // The fix: BoxGeometry vertex order per face is [top-left, top-right, bottom-left, bottom-right]
+    // With offset (0,0) and a 4x4 box on a 16x16 texture, the front face UV rect is:
+    // u1=0, v1=0 (top in image), u2=0.25, v2=0.25 (bottom in image)
+    // After V-flip: top-left = (0, 1-0) = (0, 1), top-right = (0.25, 1)
+    //               bottom-left = (0, 0.75), bottom-right = (0.25, 0.75)
+    const geometry = new THREE.BoxGeometry(4, 4, 4);
+    const layout = {
+      front: {
+        offset: { x: 0, y: 0 },
+        mirror: { x: false, y: false },
+        angle: 0 as const,
+      },
+    };
+
+    applyTextureLayoutToGeometry(geometry, layout, 16, 16, { x: 4, y: 4, z: 4 });
+
+    const uvs = geometry.getAttribute("uv").array as Float32Array;
+    // Front face is index 4 in BoxGeometry, so starts at vertex 16
+    const frontStart = 4 * 4 * 2; // face 4, 4 verts, 2 components
+
+    // Vertex 0 (top-left): should have smallest U, largest V
+    expect(uvs[frontStart]).toBeCloseTo(0, 4);     // u1 = 0/16 = 0
+    expect(uvs[frontStart + 1]).toBeCloseTo(1, 4);  // 1 - v1 = 1 - 0 = 1
+
+    // Vertex 1 (top-right): should have largest U, largest V
+    expect(uvs[frontStart + 2]).toBeCloseTo(0.25, 4); // u2 = 4/16 = 0.25
+    expect(uvs[frontStart + 3]).toBeCloseTo(1, 4);     // 1 - v1 = 1
+
+    // Vertex 2 (bottom-left): should have smallest U, smallest V
+    expect(uvs[frontStart + 4]).toBeCloseTo(0, 4);     // u1 = 0
+    expect(uvs[frontStart + 5]).toBeCloseTo(0.75, 4);  // 1 - v2 = 1 - 4/16 = 0.75
+
+    // Vertex 3 (bottom-right): should have largest U, smallest V
+    expect(uvs[frontStart + 6]).toBeCloseTo(0.25, 4);  // u2 = 0.25
+    expect(uvs[frontStart + 7]).toBeCloseTo(0.75, 4);  // 1 - v2 = 0.75
+  });
+
+  it("should place offset face UVs at correct region", () => {
+    // With offset (8, 4) on a 32x32 texture and 4x6 front face (size x=4, y=6, z=2):
+    // u1 = 8/32 = 0.25, v1 = 4/32 = 0.125, u2 = 12/32 = 0.375, v2 = 10/32 = 0.3125
+    const geometry = new THREE.BoxGeometry(4, 6, 2);
+    const layout = {
+      front: {
+        offset: { x: 8, y: 4 },
+        mirror: { x: false, y: false },
+        angle: 0 as const,
+      },
+    };
+
+    applyTextureLayoutToGeometry(geometry, layout, 32, 32, { x: 4, y: 6, z: 2 });
+
+    const uvs = geometry.getAttribute("uv").array as Float32Array;
+    const frontStart = 4 * 4 * 2;
+
+    // Vertex 0 (top-left): u1, 1-v1
+    expect(uvs[frontStart]).toBeCloseTo(0.25, 4);
+    expect(uvs[frontStart + 1]).toBeCloseTo(0.875, 4); // 1 - 0.125
+
+    // Vertex 3 (bottom-right): u2, 1-v2
+    expect(uvs[frontStart + 6]).toBeCloseTo(0.375, 4);
+    expect(uvs[frontStart + 7]).toBeCloseTo(0.6875, 4); // 1 - 0.3125
+  });
+
+  it("should flip U coordinates when mirror.x is true", () => {
+    const geometry = new THREE.BoxGeometry(4, 4, 4);
+    const layout = {
+      front: {
+        offset: { x: 0, y: 0 },
+        mirror: { x: true, y: false },
+        angle: 0 as const,
+      },
+    };
+
+    applyTextureLayoutToGeometry(geometry, layout, 16, 16, { x: 4, y: 4, z: 4 });
+
+    const uvs = geometry.getAttribute("uv").array as Float32Array;
+    const frontStart = 4 * 4 * 2;
+
+    // With mirror.x=true and offset (0,0), mirrorX=-1:
+    // u1 = 0/16 = 0, u2 = (0 + 4*(-1))/16 = -0.25
+    // This makes u2 < u1, effectively reversing the texture horizontally
+    // Vertex 0 (top-left): u1=0
+    expect(uvs[frontStart]).toBeCloseTo(0, 4);
+    // Vertex 1 (top-right): u2=-0.25 (mirrored)
+    expect(uvs[frontStart + 2]).toBeCloseTo(-0.25, 4);
+    // The U values are swapped relative to non-mirrored (where u1=0, u2=0.25)
+    expect(uvs[frontStart + 2]).toBeLessThan(uvs[frontStart]);
+  });
+});
