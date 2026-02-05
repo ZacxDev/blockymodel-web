@@ -603,17 +603,18 @@ export function applyTextureLayoutToGeometry(
         textureHeight
       );
 
-      // BoxGeometry vertex order per face (looking at front face):
-      // [0]: bottom-left, [1]: bottom-right, [2]: top-left, [3]: top-right
+      // BoxGeometry vertex order per face (verified from Three.js source):
+      // [0]: top-left (UV 0,1), [1]: top-right (UV 1,1),
+      // [2]: bottom-left (UV 0,0), [3]: bottom-right (UV 1,0)
       //
-      // Note: V coordinate is flipped because Hytale uses image coordinates
-      // (top-left origin) while Three.js textures use bottom-left origin.
-      // We flip V by using (1 - v) to convert between coordinate systems.
+      // V coordinate is flipped because Hytale uses image coordinates
+      // (top-left origin, y increases downward) while Three.js UV uses
+      // bottom-left origin (v increases upward). Convert with (1 - v).
       vertexUVs = [
-        [u1, 1 - v2], // bottom-left  (v2 is bottom in image coords)
-        [u2, 1 - v2], // bottom-right
-        [u1, 1 - v1], // top-left     (v1 is top in image coords)
-        [u2, 1 - v1], // top-right
+        [u1, 1 - v1], // [0] top-left     (v1 is top in image coords)
+        [u2, 1 - v1], // [1] top-right
+        [u1, 1 - v2], // [2] bottom-left  (v2 is bottom in image coords)
+        [u2, 1 - v2], // [3] bottom-right
       ];
     }
 
