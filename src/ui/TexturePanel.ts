@@ -76,10 +76,21 @@ export class TexturePanel {
     const width = img.width || img.naturalWidth;
     const height = img.height || img.naturalHeight;
 
-    // Show preview
-    if (this.previewImg && img.src) {
-      this.previewImg.src = img.src;
-      this.previewImg.style.display = "block";
+    // Create a data URL from the image since blob URLs may be revoked
+    if (this.previewImg && width && height) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          this.previewImg.src = canvas.toDataURL("image/png");
+          this.previewImg.style.display = "block";
+        }
+      } catch (e) {
+        console.warn("Could not create texture preview:", e);
+      }
     }
     if (placeholder) placeholder.style.display = "none";
 

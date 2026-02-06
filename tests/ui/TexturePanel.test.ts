@@ -8,6 +8,13 @@ class MockEditor {
   off = vi.fn();
 }
 
+// Mock canvas context for texture preview
+const mockContext = {
+  drawImage: vi.fn(),
+};
+
+const mockToDataURL = vi.fn().mockReturnValue("data:image/png;base64,mockdata");
+
 describe("TexturePanel", () => {
   let container: HTMLDivElement;
   let mockEditor: MockEditor;
@@ -27,6 +34,10 @@ describe("TexturePanel", () => {
 
     // Create mock editor
     mockEditor = new MockEditor();
+
+    // Mock canvas getContext and toDataURL
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(mockContext as never);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(mockToDataURL);
   });
 
   describe("constructor", () => {
@@ -114,7 +125,7 @@ describe("TexturePanel", () => {
 
       expect(placeholder.style.display).toBe("none");
       expect(preview.style.display).toBe("block");
-      expect(preview.src).toBe("data:image/png;base64,test");
+      expect(preview.src).toContain("data:image/png");
       expect(dimensions?.textContent).toBe("128 × 256 px");
       expect(reloadBtn.disabled).toBe(false);
     });
@@ -138,21 +149,25 @@ describe("TexturePanel", () => {
       expect(dimensions?.textContent).toBe("64 × 64 px");
     });
 
-    it("should not set preview src if image has no src", () => {
+    it("should handle canvas errors gracefully", () => {
+      // Mock getContext to return null to simulate error
+      vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+
       const panel = new TexturePanel(mockEditor as never, "texture-panel");
 
       const mockImage = {
         width: 128,
         height: 128,
-        src: "",
       } as HTMLImageElement;
 
       const texture = new THREE.Texture(mockImage);
-      panel.setTexture(texture);
 
-      const preview = container.querySelector("#texture-preview") as HTMLImageElement;
-      // Preview should not have been updated since src is empty
-      expect(preview.src).toBe("");
+      // Should not throw even when canvas context fails
+      expect(() => panel.setTexture(texture)).not.toThrow();
+
+      // Dimensions should still be updated
+      const dimensions = container.querySelector("#texture-dimensions");
+      expect(dimensions?.textContent).toBe("128 × 128 px");
     });
   });
 
