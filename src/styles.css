@@ -507,6 +507,70 @@ button:disabled:hover,
   font-size: 10px;
 }
 
+/* Texture Panel */
+.texture-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.texture-preview-container {
+  background-color: var(--bg-primary);
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+}
+
+.texture-preview-placeholder {
+  color: var(--text-secondary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.texture-preview {
+  max-width: 100%;
+  max-height: 150px;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+}
+
+.texture-info {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.texture-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.panel-btn {
+  flex: 1;
+  padding: 6px 12px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.panel-btn:hover:not(:disabled) {
+  background-color: var(--bg-secondary);
+}
+
+.panel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Status bar */
 .status-bar {
   display: flex;

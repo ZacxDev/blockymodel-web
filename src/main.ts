@@ -4,8 +4,10 @@ import { Editor } from "./editor/Editor";
 import { PropertyPanel } from "./ui/PropertyPanel";
 import { HierarchyPanel } from "./ui/HierarchyPanel";
 import { UVEditor } from "./ui/UVEditor";
+import { TexturePanel } from "./ui/TexturePanel";
 import { confirm } from "./ui/ConfirmDialog";
 import { Serializer } from "./editor/Serializer";
+import { AddNodeCommand } from "./editor/commands/AddNodeCommand";
 import "./styles.css";
 
 // Global instances
@@ -14,7 +16,9 @@ let editor: Editor;
 let _propertyPanel: PropertyPanel;
 let hierarchyPanel: HierarchyPanel;
 let _uvEditor: UVEditor;
+let texturePanel: TexturePanel;
 let serializer: Serializer;
+let currentTexture: THREE.Texture | null = null;
 
 function init(): void {
   const container = document.getElementById("viewport");
@@ -42,6 +46,7 @@ function init(): void {
   _propertyPanel = new PropertyPanel(editor, "property-panel");
   hierarchyPanel = new HierarchyPanel(editor, "hierarchy-panel");
   _uvEditor = new UVEditor(editor, "uv-panel");
+  texturePanel = new TexturePanel(editor, "texture-panel");
 
   // Setup file inputs
   setupFileInputs();
@@ -80,7 +85,8 @@ function setupFileInputs(): void {
     if (file) {
       try {
         updateStatus("Applying texture...");
-        await viewer.loadTexture(file);
+        currentTexture = await viewer.loadTexture(file);
+        texturePanel.setTexture(currentTexture);
         updateStatus(`Texture applied: ${file.name}`);
       } catch (error) {
         updateStatus(`Error: ${error}`);
@@ -123,7 +129,8 @@ function setupFileInputs(): void {
         if (file.name.endsWith(".blockymodel")) {
           await loadModel(file);
         } else if (file.name.match(/\.(png|jpg|jpeg)$/i)) {
-          await viewer.loadTexture(file);
+          currentTexture = await viewer.loadTexture(file);
+          texturePanel.setTexture(currentTexture);
           updateStatus(`Texture applied: ${file.name}`);
         }
       }
@@ -198,6 +205,41 @@ function setupToolbar(): void {
   const redoBtn = document.getElementById("redo-btn") as HTMLButtonElement;
   redoBtn?.addEventListener("click", () => {
     editor.redo();
+  });
+
+  // Add Node button
+  const addNodeBtn = document.getElementById("add-node-btn");
+  addNodeBtn?.addEventListener("click", () => {
+    const model = editor.getModel();
+    if (!model) {
+      updateStatus("Load a model first to add nodes");
+      return;
+    }
+
+    // Create a new box mesh
+    const geometry = new THREE.BoxGeometry(16, 16, 16);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      metalness: 0.1,
+      roughness: 0.8,
+    });
+
+    // Apply current texture if available
+    if (currentTexture) {
+      material.map = currentTexture;
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = `Box_${Date.now()}`;
+    mesh.userData.shapeType = "box";
+    mesh.userData.originalSize = { x: 16, y: 16, z: 16 };
+
+    // Add to selected object or root model
+    const parent = editor.getSelected() || model;
+    editor.execute(new AddNodeCommand(parent, mesh));
+    editor.select(mesh);
+    hierarchyPanel.refresh();
+    updateStatus(`Added new box: ${mesh.name}`);
   });
 
   // Mode buttons

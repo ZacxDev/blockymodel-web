@@ -35,6 +35,12 @@
 
         <div class="toolbar-separator"></div>
 
+        <div class="toolbar-group">
+          <button id="add-node-btn" class="toolbar-btn" title="Add Box Node">➕ Add Node</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
         <div class="toolbar-group mode-group">
           <button id="mode-translate" class="mode-btn active" title="Translate (G)">↔ Move</button>
           <button id="mode-rotate" class="mode-btn" title="Rotate (R)">⟳ Rotate</button>
@@ -92,6 +98,17 @@
             </div>
             <div class="panel-content" id="uv-content">
               <div id="uv-panel"></div>
+            </div>
+          </div>
+
+          <!-- Texture Panel -->
+          <div class="panel-section">
+            <div class="panel-header collapsible" data-target="texture-content">
+              <span class="collapse-icon">▼</span>
+              Texture
+            </div>
+            <div class="panel-content" id="texture-content">
+              <div id="texture-panel"></div>
             </div>
           </div>
 
