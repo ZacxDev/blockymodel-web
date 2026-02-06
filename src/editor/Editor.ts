@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { SelectionManager } from "./SelectionManager";
 import { TransformManager } from "./TransformManager";
+import { TextureEditManager } from "./TextureEditManager";
 import { History } from "./History";
-import type { Command } from "./commands/Command";
+import type { Command, TextureCommand } from "./commands/Command";
 import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export type EditorEvent =
@@ -36,9 +37,11 @@ export class Editor {
 
   public readonly selection: SelectionManager;
   public readonly transform: TransformManager;
+  public readonly textureEdit: TextureEditManager;
   public readonly history: History;
 
   private currentModel: THREE.Group | null = null;
+  private isTextureEditMode = false;
   private eventListeners: Map<EditorEvent, Set<EventCallback>> = new Map();
 
   constructor(options: EditorOptions) {
@@ -52,6 +55,16 @@ export class Editor {
     this.history = new History();
     this.selection = new SelectionManager(this);
     this.transform = new TransformManager(this);
+    this.textureEdit = new TextureEditManager(
+      this.scene,
+      this.camera,
+      this.domElement
+    );
+
+    // Wire up texture edit command execution to history
+    this.textureEdit.setCommandExecutor((cmd: TextureCommand) => {
+      this.history.executeTextureCommand(cmd);
+    });
 
     // Forward selection events
     this.selection.on("selectionChanged", (object: THREE.Object3D | null) => {
@@ -162,17 +175,78 @@ export class Editor {
   }
 
   /**
-   * Set transform mode
+   * Set transform mode (or texture edit mode)
    */
-  setTransformMode(mode: "translate" | "rotate" | "scale"): void {
-    this.transform.setMode(mode);
+  setTransformMode(mode: "translate" | "rotate" | "scale" | "texture"): void {
+    if (mode === "texture") {
+      this.enableTextureEditMode();
+    } else {
+      this.disableTextureEditMode();
+      this.transform.setMode(mode);
+    }
   }
 
   /**
    * Get current transform mode
    */
-  getTransformMode(): "translate" | "rotate" | "scale" {
+  getTransformMode(): "translate" | "rotate" | "scale" | "texture" {
+    if (this.isTextureEditMode) {
+      return "texture";
+    }
     return this.transform.getMode();
+  }
+
+  /**
+   * Enable texture editing mode
+   */
+  enableTextureEditMode(): void {
+    if (this.isTextureEditMode) return;
+
+    this.isTextureEditMode = true;
+    this.selection.setEnabled(false);
+    this.transform.attach(null);
+    this.textureEdit.enable();
+    this.emit("modeChanged", "texture");
+  }
+
+  /**
+   * Disable texture editing mode
+   */
+  disableTextureEditMode(): void {
+    if (!this.isTextureEditMode) return;
+
+    this.isTextureEditMode = false;
+    this.textureEdit.disable();
+    this.selection.setEnabled(true);
+    this.emit("modeChanged", this.transform.getMode());
+  }
+
+  /**
+   * Check if texture edit mode is active
+   */
+  isInTextureEditMode(): boolean {
+    return this.isTextureEditMode;
+  }
+
+  /**
+   * Set the texture to edit (call when texture is loaded)
+   */
+  setEditableTexture(texture: THREE.Texture | null, mesh: THREE.Mesh | null): void {
+    this.textureEdit.setTexture(texture, mesh);
+  }
+
+  /**
+   * Export the current texture to a file
+   */
+  async exportTexture(filename: string = "texture.png"): Promise<boolean> {
+    return this.textureEdit.exportTexture(filename);
+  }
+
+  /**
+   * Check if there's an editable texture available
+   */
+  hasEditableTexture(): boolean {
+    return this.textureEdit.hasEditableTexture();
   }
 
   /**

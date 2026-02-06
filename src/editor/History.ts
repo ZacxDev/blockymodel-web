@@ -1,6 +1,7 @@
-import type { Command } from "./commands/Command";
+import type { Command, TextureCommand } from "./commands/Command";
 
 type HistoryCallback = () => void;
+type AnyCommand = Command | TextureCommand;
 
 const MERGE_WINDOW_MS = 500; // Commands within this window can be merged
 
@@ -8,8 +9,8 @@ const MERGE_WINDOW_MS = 500; // Commands within this window can be merged
  * Manages undo/redo history for editor commands
  */
 export class History {
-  private undoStack: Command[] = [];
-  private redoStack: Command[] = [];
+  private undoStack: AnyCommand[] = [];
+  private redoStack: AnyCommand[] = [];
   private eventListeners: Map<string, Set<HistoryCallback>> = new Map();
 
   /**
@@ -20,17 +21,18 @@ export class History {
 
     // Try to merge with last command if within time window and updatable
     const lastCommand = this.undoStack[this.undoStack.length - 1];
+    const lastAsCommand = lastCommand as Command | undefined;
     if (
-      lastCommand &&
-      lastCommand.updatable &&
+      lastAsCommand &&
+      lastAsCommand.updatable &&
       command.updatable &&
-      lastCommand.type === command.type &&
-      lastCommand.object === command.object &&
-      command.timestamp - lastCommand.timestamp < MERGE_WINDOW_MS
+      lastAsCommand.type === command.type &&
+      lastAsCommand.object === command.object &&
+      command.timestamp - lastAsCommand.timestamp < MERGE_WINDOW_MS
     ) {
       // Merge into existing command
-      if (lastCommand.update) {
-        lastCommand.update(command);
+      if (lastAsCommand.update) {
+        lastAsCommand.update(command);
       }
     } else {
       // Add as new command
@@ -40,6 +42,18 @@ export class History {
     // Clear redo stack on new action
     this.redoStack = [];
 
+    this.emit("historyChanged");
+  }
+
+  /**
+   * Execute a texture command (painting, etc.) and add to history
+   * Texture commands don't support merging
+   */
+  executeTextureCommand(command: TextureCommand): void {
+    // Don't execute - texture commands are already executed during the paint stroke
+    // Just add to history for undo support
+    this.undoStack.push(command);
+    this.redoStack = [];
     this.emit("historyChanged");
   }
 

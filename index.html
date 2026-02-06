@@ -24,6 +24,7 @@
           </label>
 
           <button id="save-model" class="toolbar-btn">💾 Save</button>
+          <button id="export-texture" class="toolbar-btn" title="Export edited texture">🖼️ Export Texture</button>
         </div>
 
         <div class="toolbar-separator"></div>
@@ -45,6 +46,7 @@
           <button id="mode-translate" class="mode-btn active" title="Translate (G)">↔ Move</button>
           <button id="mode-rotate" class="mode-btn" title="Rotate (R)">⟳ Rotate</button>
           <button id="mode-scale" class="mode-btn" title="Scale (S)">⤢ Scale</button>
+          <button id="mode-texture" class="mode-btn" title="Texture Paint (T)">🎨 Paint</button>
         </div>
 
         <div class="toolbar-separator"></div>
@@ -112,6 +114,17 @@
             </div>
           </div>
 
+          <!-- Brush Panel (shown in texture edit mode) -->
+          <div class="panel-section" id="brush-panel-section" style="display: none;">
+            <div class="panel-header collapsible" data-target="brush-content">
+              <span class="collapse-icon">▼</span>
+              Brush Settings
+            </div>
+            <div class="panel-content" id="brush-content">
+              <div id="brush-panel"></div>
+            </div>
+          </div>
+
         </aside>
       </main>
 
@@ -124,6 +137,7 @@
           <span><kbd>G</kbd> Move</span>
           <span><kbd>R</kbd> Rotate</span>
           <span><kbd>S</kbd> Scale</span>
+          <span><kbd>T</kbd> Paint</span>
           <span><kbd>Ctrl+Z</kbd> Undo</span>
           <span><kbd>Del</kbd> Delete</span>
         </div>

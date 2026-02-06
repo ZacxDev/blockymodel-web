@@ -5,6 +5,7 @@ import { PropertyPanel } from "./ui/PropertyPanel";
 import { HierarchyPanel } from "./ui/HierarchyPanel";
 import { UVEditor } from "./ui/UVEditor";
 import { TexturePanel } from "./ui/TexturePanel";
+import { BrushPanel } from "./ui/BrushPanel";
 import { confirm } from "./ui/ConfirmDialog";
 import { Serializer } from "./editor/Serializer";
 import { AddNodeCommand } from "./editor/commands/AddNodeCommand";
@@ -17,8 +18,10 @@ let _propertyPanel: PropertyPanel;
 let hierarchyPanel: HierarchyPanel;
 let _uvEditor: UVEditor;
 let texturePanel: TexturePanel;
+let brushPanel: BrushPanel;
 let serializer: Serializer;
 let currentTexture: THREE.Texture | null = null;
+let currentTextureMesh: THREE.Mesh | null = null;
 
 function init(): void {
   const container = document.getElementById("viewport");
@@ -47,6 +50,7 @@ function init(): void {
   hierarchyPanel = new HierarchyPanel(editor, "hierarchy-panel");
   _uvEditor = new UVEditor(editor, "uv-panel");
   texturePanel = new TexturePanel(editor, "texture-panel");
+  brushPanel = new BrushPanel(editor.textureEdit, "brush-panel");
 
   // Setup file inputs
   setupFileInputs();
@@ -87,6 +91,18 @@ function setupFileInputs(): void {
         updateStatus("Applying texture...");
         currentTexture = await viewer.loadTexture(file);
         texturePanel.setTexture(currentTexture);
+
+        // Find first mesh for texture editing
+        currentTextureMesh = null;
+        const model = editor.getModel();
+        if (model) {
+          model.traverse((obj) => {
+            if (!currentTextureMesh && obj instanceof THREE.Mesh) {
+              currentTextureMesh = obj;
+            }
+          });
+        }
+        editor.setEditableTexture(currentTexture, currentTextureMesh);
         updateStatus(`Texture applied: ${file.name}`);
       } catch (error) {
         updateStatus(`Error: ${error}`);
@@ -131,6 +147,18 @@ function setupFileInputs(): void {
         } else if (file.name.match(/\.(png|jpg|jpeg)$/i)) {
           currentTexture = await viewer.loadTexture(file);
           texturePanel.setTexture(currentTexture);
+
+          // Find first mesh for texture editing
+          currentTextureMesh = null;
+          const model = editor.getModel();
+          if (model) {
+            model.traverse((obj) => {
+              if (!currentTextureMesh && obj instanceof THREE.Mesh) {
+                currentTextureMesh = obj;
+              }
+            });
+          }
+          editor.setEditableTexture(currentTexture, currentTextureMesh);
           updateStatus(`Texture applied: ${file.name}`);
         }
       }
@@ -195,6 +223,21 @@ function setupToolbar(): void {
     }
   });
 
+  // Export texture button
+  const exportTextureBtn = document.getElementById("export-texture");
+  exportTextureBtn?.addEventListener("click", async () => {
+    if (!editor.hasEditableTexture()) {
+      updateStatus("No texture to export - load a texture first");
+      return;
+    }
+    const success = await editor.exportTexture("texture.png");
+    if (success) {
+      updateStatus("Texture exported");
+    } else {
+      updateStatus("Failed to export texture");
+    }
+  });
+
   // Undo button
   const undoBtn = document.getElementById("undo-btn") as HTMLButtonElement;
   undoBtn?.addEventListener("click", () => {
@@ -246,6 +289,7 @@ function setupToolbar(): void {
   const modeTranslate = document.getElementById("mode-translate");
   const modeRotate = document.getElementById("mode-rotate");
   const modeScale = document.getElementById("mode-scale");
+  const modeTexture = document.getElementById("mode-texture");
 
   modeTranslate?.addEventListener("click", () => {
     editor.setTransformMode("translate");
@@ -257,6 +301,14 @@ function setupToolbar(): void {
 
   modeScale?.addEventListener("click", () => {
     editor.setTransformMode("scale");
+  });
+
+  modeTexture?.addEventListener("click", () => {
+    if (!currentTexture) {
+      updateStatus("Load a texture first to enable painting");
+      return;
+    }
+    editor.setTransformMode("texture");
   });
 }
 
@@ -287,6 +339,33 @@ function setupKeyboardShortcuts(): void {
           updateStatus("Model saved");
         }
       }
+      return;
+    }
+
+    // Transform mode shortcuts
+    switch (e.key.toLowerCase()) {
+      case "g":
+        editor.setTransformMode("translate");
+        break;
+      case "r":
+        editor.setTransformMode("rotate");
+        break;
+      case "s":
+        editor.setTransformMode("scale");
+        break;
+      case "t":
+        if (currentTexture) {
+          editor.setTransformMode("texture");
+        } else {
+          updateStatus("Load a texture first to enable painting");
+        }
+        break;
+      case "escape":
+        // Exit texture mode back to translate
+        if (editor.isInTextureEditMode()) {
+          editor.setTransformMode("translate");
+        }
+        break;
     }
   });
 }
@@ -334,6 +413,12 @@ function setupEditorEvents(): void {
     });
     const activeBtn = document.getElementById(`mode-${mode}`);
     activeBtn?.classList.add("active");
+
+    // Show/hide brush panel based on texture edit mode
+    const brushPanelSection = document.getElementById("brush-panel-section");
+    if (brushPanelSection) {
+      brushPanelSection.style.display = mode === "texture" ? "" : "none";
+    }
   });
 
   // History changed

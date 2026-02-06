@@ -882,3 +882,88 @@ input[type="number"] {
   line-height: 1.6;
   color: var(--text-secondary);
 }
+
+/* Brush Panel */
+.brush-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.brush-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brush-setting label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.brush-color-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.brush-color-row input[type="color"] {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-input);
+  cursor: pointer;
+}
+
+.brush-color-row input[type="text"] {
+  flex: 1;
+  padding: 4px 8px;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.brush-setting input[type="range"] {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-input);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.brush-setting input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.brush-setting input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.brush-info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.brush-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+}

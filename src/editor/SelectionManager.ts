@@ -20,6 +20,7 @@ export class SelectionManager {
   // Track mouse down position to distinguish clicks from drags
   private mouseDownPos: { x: number; y: number } | null = null;
   private static readonly DRAG_THRESHOLD = 5; // pixels
+  private enabled = true;
 
   constructor(editor: Editor) {
     this.editor = editor;
@@ -44,6 +45,11 @@ export class SelectionManager {
    * Handle click events for selection — suppressed if mouse was dragged
    */
   private handleClick(event: MouseEvent): void {
+    // Ignore if selection is disabled (e.g., during texture edit mode)
+    if (!this.enabled) {
+      return;
+    }
+
     // Ignore if clicking on UI elements or during transform
     if (event.target !== this.editor.renderer.domElement) {
       return;
@@ -142,6 +148,20 @@ export class SelectionManager {
    */
   getSelected(): THREE.Object3D | null {
     return this.selected;
+  }
+
+  /**
+   * Enable or disable selection
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  /**
+   * Check if selection is enabled
+   */
+  isEnabled(): boolean {
+    return this.enabled;
   }
 
   /**

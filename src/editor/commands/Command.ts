@@ -44,6 +44,18 @@ export interface Command {
 }
 
 /**
+ * Interface for texture-related commands (painting, etc.)
+ * These don't operate on Object3D but on texture data
+ */
+export interface TextureCommand {
+  readonly type: string;
+  execute(): void;
+  undo(): void;
+  readonly updatable: boolean;
+  readonly timestamp: number;
+}
+
+/**
  * Base class providing common functionality for commands
  */
 export abstract class BaseCommand implements Command {
