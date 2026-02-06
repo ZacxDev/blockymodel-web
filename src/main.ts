@@ -277,9 +277,17 @@ function setupToolbar(): void {
     mesh.userData.shapeType = "box";
     mesh.userData.originalSize = { x: 16, y: 16, z: 16 };
 
+    // Ensure geometry bounds are computed for raycasting
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+
     // Add to selected object or root model
     const parent = editor.getSelected() || model;
     editor.execute(new AddNodeCommand(parent, mesh));
+
+    // Update world matrix for raycasting to work immediately
+    mesh.updateMatrixWorld(true);
+
     editor.select(mesh);
     hierarchyPanel.refresh();
     updateStatus(`Added new box: ${mesh.name}`);
