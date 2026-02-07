@@ -47,6 +47,9 @@
     "url": "https://github.com/ZacxDev/blockymodel-web/issues"
   },
   "homepage": "https://github.com/ZacxDev/blockymodel-web#readme",
+  "dependencies": {
+    "blockymodel-texture": "^0.1.0"
+  },
   "peerDependencies": {
     "three": ">=0.150.0"
   },
