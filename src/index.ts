@@ -19,6 +19,8 @@ export { RemoveNodeCommand } from "./editor/commands/RemoveNodeCommand";
 export { PropertyPanel } from "./ui/PropertyPanel";
 export { HierarchyPanel } from "./ui/HierarchyPanel";
 export { UVEditor } from "./ui/UVEditor";
+export { TexturePanel } from "./ui/TexturePanel";
+export type { TextureSlot } from "./ui/TexturePanel";
 
 // Loader
 export {

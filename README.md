@@ -189,6 +189,32 @@ const texture = new THREE.TextureLoader().load('/texture.png');
 applyTextureToModel(model, texture);
 ```
 
+### ViewerController Multi-Texture Support
+
+For blocks with different textures per face (e.g., grass blocks):
+
+```typescript
+import { ViewerController } from 'blockymodel-web';
+
+const viewer = new ViewerController({ container });
+await viewer.loadModel(modelFile);
+
+// Load multiple textures for per-face rendering
+const multiTexture = await viewer.loadMultiTexture({
+  top: '/textures/grass_top.png',
+  sides: '/textures/grass_side.png',
+  bottom: '/textures/dirt.png',
+});
+
+// Apply to current model
+viewer.applyMultiTexture(multiTexture);
+```
+
+This creates 6 separate materials for box geometries, mapping:
+- `top` → +Y face
+- `bottom` → -Y face
+- `sides` → +X, -X, +Z, -Z faces
+
 ## BlockyModel Format
 
 ```typescript

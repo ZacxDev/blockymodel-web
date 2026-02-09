@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { BlockyModelLoader, applyTextureToModel } from "../loaders/BlockyModelLoader";
+import type { MultiTextureMap } from "blockymodel-texture";
 
 export interface ViewerOptions {
   container: HTMLElement;
@@ -178,6 +179,66 @@ export class ViewerController {
     } finally {
       URL.revokeObjectURL(url);
     }
+  }
+
+  /**
+   * Load a texture from a URL
+   * @returns The loaded texture
+   */
+  async loadTextureFromUrl(url: string): Promise<THREE.Texture> {
+    return new Promise<THREE.Texture>((resolve, reject) => {
+      this.textureLoader.load(url, resolve, undefined, reject);
+    });
+  }
+
+  /**
+   * Load multiple textures for per-face application (e.g., grass blocks)
+   * @returns MultiTextureMap with loaded textures
+   */
+  async loadMultiTexture(urls: {
+    default?: string;
+    top?: string;
+    bottom?: string;
+    sides?: string;
+  }): Promise<MultiTextureMap> {
+    const result: MultiTextureMap = {};
+
+    const loadOne = async (url: string): Promise<THREE.Texture> => {
+      return new Promise<THREE.Texture>((resolve, reject) => {
+        this.textureLoader.load(url, resolve, undefined, reject);
+      });
+    };
+
+    // Load all textures in parallel
+    const promises: Promise<void>[] = [];
+
+    if (urls.default) {
+      promises.push(loadOne(urls.default).then((tex) => { result.default = tex; }));
+    }
+    if (urls.top) {
+      promises.push(loadOne(urls.top).then((tex) => { result.top = tex; }));
+    }
+    if (urls.bottom) {
+      promises.push(loadOne(urls.bottom).then((tex) => { result.bottom = tex; }));
+    }
+    if (urls.sides) {
+      promises.push(loadOne(urls.sides).then((tex) => { result.sides = tex; }));
+    }
+
+    await Promise.all(promises);
+    return result;
+  }
+
+  /**
+   * Apply a multi-texture map to the current model
+   */
+  applyMultiTexture(multiTexture: MultiTextureMap): void {
+    if (!this.currentModel) {
+      console.warn("No model loaded to apply texture to");
+      return;
+    }
+    applyTextureToModel(this.currentModel, multiTexture);
+    console.log("Multi-texture applied");
   }
 
   /**

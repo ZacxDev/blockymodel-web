@@ -571,6 +571,79 @@ button:disabled:hover,
   cursor: not-allowed;
 }
 
+/* Multi-texture mode */
+.texture-mode-toggle {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.texture-slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.texture-slots-grid .texture-slot:last-child {
+  grid-column: span 2;
+}
+
+.texture-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.texture-slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.texture-slot-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.texture-load-btn {
+  padding: 2px 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.texture-load-btn:hover {
+  background: var(--bg-secondary);
+}
+
+.texture-preview-container.small {
+  min-height: 60px;
+  padding: 4px;
+}
+
+.texture-preview-container.small .texture-preview {
+  max-height: 80px;
+}
+
+.texture-preview-container.small .texture-preview-placeholder {
+  font-size: 10px;
+}
+
 /* Status bar */
 .status-bar {
   display: flex;

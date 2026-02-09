@@ -55,6 +55,58 @@ docker run -p 8080:8080 blockymodel-editor
 - `src/editor/commands/Command.ts` - Base interface, all commands must implement execute/undo
 - `src/types/blockymodel.ts` - BlockyModel JSON format types
 - `src/loader/BlockyModelLoader.ts` - Loads .blockymodel JSON into Three.js scene
+- `src/viewer/ViewerController.ts` - 3D viewport with model/texture loading
+- `src/ui/TexturePanel.ts` - Texture management with multi-texture support
+
+## Multi-Texture Support
+
+ViewerController supports per-face textures for voxel blocks (e.g., grass with different top/side/bottom):
+
+```typescript
+// Load textures for each face type
+const multiTex = await viewer.loadMultiTexture({
+  top: '/textures/grass_top.png',
+  sides: '/textures/grass_side.png',
+  bottom: '/textures/dirt.png',
+});
+viewer.applyMultiTexture(multiTex);
+```
+
+URL params for deep linking: `?model=...&textureTop=...&textureSides=...&textureBottom=...`
+
+Uses `MultiTextureMap` from `blockymodel-texture` package. Creates 6 materials for BoxGeometry faces.
+
+## TexturePanel UI
+
+The TexturePanel supports both single-texture and multi-texture modes:
+
+```typescript
+import { TexturePanel, TextureSlot } from 'blockymodel-web';
+
+const texturePanel = new TexturePanel(editor, 'texture-panel');
+
+// Single texture mode (default)
+texturePanel.setTexture(texture);
+
+// Multi-texture mode
+texturePanel.setMultiTextureMode(true);
+texturePanel.setSlotTexture('top', topTexture);
+texturePanel.setSlotTexture('sides', sidesTexture);
+texturePanel.setSlotTexture('bottom', bottomTexture);
+
+// Or set all at once from MultiTextureMap
+texturePanel.setMultiTexture(multiTex);
+
+// Get current multi-texture configuration
+const multiTex = texturePanel.getMultiTexture();
+
+// Callback for when user clicks load button
+texturePanel.onLoadTexture = (slot: TextureSlot) => {
+  // Open file picker for specific slot
+};
+```
+
+TextureSlot types: `"default"` | `"top"` | `"sides"` | `"bottom"`
 
 ## npm Publishing
 
